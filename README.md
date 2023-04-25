@@ -2,7 +2,7 @@
 
 Detect and recognize face in realtime.
 
-Best FPS achieved is 18.
+Best FPS achieved around is 15 - 18.
 
 **TO DO:**
 
@@ -16,6 +16,11 @@ Best FPS achieved is 18.
 
 * Demo web-base application
 
+* Containerize with Docker
+
+# Demo
+
+![](./assets/demo.png)
 
 # Run code
 1. Install dependencies
