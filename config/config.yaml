@@ -1,0 +1,27 @@
+# configure FPS appearance on frame
+FRAME:
+  WIDTH: 360
+  HEIGHT: 120
+
+FPS:
+  TEXT:
+    font: 0
+    fontScale: 1
+    color: [0,0,255]
+    thickness: 4
+  BACKGROUND:
+    color: [255,255,255]
+    padding: 6
+
+BB:
+  BOX:
+    color: [255,0,0]
+    thickness: 2
+  TEXT:
+    font: 0
+    fontScale: 0.75
+    color: [0,255,0]
+    thickness: 2
+  BACKGROUND:
+    color: [255,0,0]
+    padding: 1
