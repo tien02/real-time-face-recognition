@@ -23,6 +23,9 @@ Best FPS achieved around is 15 - 18.
 ![](./assets/demo.png)
 
 # Run code
+
+Expect `Python >= 3.10`
+
 1. Install dependencies
 ```
 pip install -r requirements.txt
