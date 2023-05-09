@@ -37,7 +37,7 @@ if __name__ == "__main__":
     
     representation_path = f"./{config['RECOGNIZER']['data_dir']}/representation.pkl"
     if not os.path.exists(representation_path):
-        print(f"Can not find {representation_path}, make sure to run create_representation.py first")
+        print(f"Can not find {representation_path}, make sure to run create_embedding.py first")
         sys.exit()
 
     # Get training data

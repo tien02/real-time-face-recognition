@@ -2,17 +2,15 @@
 
 Detect and recognize face in realtime.
 
-Best FPS achieved around is 15 - 18.
-
 **TO DO:**
 
-* ~~Add threading to capture video from webcam~~
 
-* ~~Prettify FPS, Bounding Box draw~~
+* Due to poor classifier performance, intend to experiment classifier with Deep Learning, Image Augmentation
 
-* Face recognition in realtime
+* Add `face-alignment` before `arc-face` feature extractor
 
-* Experiment with TorchScript, ONNX Runtime
+* Multiprocessing improve speed
+
 
 * Demo web-base application
 
@@ -21,6 +19,7 @@ Best FPS achieved around is 15 - 18.
 # Demo
 
 ![](./assets/demo.png)
+![](assets/demo2.png)
 
 # Run code
 
@@ -31,7 +30,45 @@ Expect `Python >= 3.10`
 pip install -r requirements.txt
 ```
 
-2. Run code
+2. Prepare data
+
+There are two options
+
+* Manually creating `facebank` data.
+
+* Get faces from webcam by running:
+
 ```
-bash run.sh
+python create_data.py
 ```
+
+Add `unknown` classes if necessary.
+
+3. Create `face embedding`
+
+Create face embedding for each image in the dataset. **Expect 1 face each images**. Embedding from `ArcFace` is a vector `(1,512)`.
+```
+python create_embedding.py
+```
+
+4. Train a Classifier
+
+Create classifier for face recognition, using machine learning algorithm. See detail in the file:
+
+```
+python create_classifier.py
+```
+
+5. Inference
+
+Run the following command for details information:
+
+```
+python main.py --help
+```
+
+* `-t` tag for task, `img` for inference on image, `vid` for inference on video.
+
+* `-p` path to the image file.
+
+* `-s` save the image/video after processing.
