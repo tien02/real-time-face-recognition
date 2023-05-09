@@ -1,16 +1,9 @@
-import yaml
 import cv2 as cv
 import numpy as np
 
-
-def load_config() -> dict:
-    with open("./config/config.yaml") as f:
-        config = yaml.safe_load(f)
-    return config
-
+from .loader import load_config
 
 config = load_config()
-
 
 def putFPS(
     frame: np.ndarray,
@@ -55,11 +48,12 @@ def putFPS(
     return frame
 
 
-def putBoundingBox(frame:np.ndarray, xmin:int, ymin:int, xmax:int, ymax:int, text:str, background:bool = True) -> np.ndarray:
+def putBoundingBox(frame:np.ndarray, box: list | np.ndarray, text:str, background:bool = True) -> np.ndarray:
+    xmin, ymin, xmax, ymax = box
     frame = cv.rectangle(
                     frame,
-                    (int(xmin), int(ymin)),
-                    (int(xmax), int(ymax)),
+                    (xmin, ymin),
+                    (xmax, ymax),
                     tuple(config["BB"]["BOX"]["color"]),
                     config["BB"]["BOX"]["thickness"],
                 )
@@ -88,10 +82,54 @@ def putBoundingBox(frame:np.ndarray, xmin:int, ymin:int, xmax:int, ymax:int, tex
     frame = cv.putText(
         frame,
         str(text),
-        (int(xmin), int(ymin)),
+        (xmin, ymin),
         config["BB"]["TEXT"]["font"],
         config["BB"]["TEXT"]["fontScale"],
         tuple(config["BB"]["TEXT"]["color"]),
         config["BB"]["TEXT"]["thickness"],
     )
     return frame
+
+
+def putTrainingData(
+        frame: np.ndarray,
+        count: str,
+        frameHeight: int,
+        frameWidth: int,
+        background: bool = False,
+) -> np.ndarray:
+    x_coor, y_coor = int(frameWidth * 0.05), int(frameHeight * (1 - 0.2))
+    text = f"Count:{count}/{config['RECOGNIZER']['max_training_img']}"
+    if background:
+        text_w, text_h = cv.getTextSize(
+            text,
+            config["FPS"]['TEXT']["font"],
+            config["FPS"]['TEXT']["fontScale"],
+            config["FPS"]['TEXT']["thickness"],
+        )[0]
+        frame = cv.rectangle(
+            frame,
+            (
+                x_coor - config['FPS']['BACKGROUND']['padding'],
+                y_coor + config['FPS']['BACKGROUND']['padding'],
+            ),
+            (
+                x_coor + text_w + config['FPS']['BACKGROUND']['padding'],
+                y_coor - text_h - config['FPS']['BACKGROUND']['padding'],
+            ),
+            tuple(config['FPS']['BACKGROUND']['color']),
+            -1,
+        )
+
+    frame = cv.putText(
+        frame,
+        text,
+        (x_coor, y_coor),
+        config["FPS"]['TEXT']["font"],
+        config["FPS"]['TEXT']["fontScale"],
+        tuple(config["FPS"]['TEXT']["color"]),
+        config["FPS"]['TEXT']["thickness"],
+    )
+
+    return frame
+
