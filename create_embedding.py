@@ -17,7 +17,7 @@ if __name__ == "__main__":
         print(f"Can not find {data_dir}")
         sys.exit()
 
-    detector, recognizer = src.loadDetectorRecognizer(keep_all=False)
+    _, recognizer = src.loadDetectorRecognizer(keep_all=False)
 
     identity_lst = []
     representation_lst = []
@@ -35,17 +35,15 @@ if __name__ == "__main__":
                 image = cv.imread(img_file)
                 if image is not None:
                     image = cv.cvtColor(image, cv.COLOR_BGR2RGB)
-                    faces, _, _, _ = detector(image)
 
-                    if faces is not None:
-                        faces = Resize((112, 112), antialias=True)(faces)
-                        if faces.dim() == 3:
-                            faces = torch.unsqueeze(faces, dim=0)
-                        faces = faces.detach().numpy().astype(np.float32)
-                        out = recognizer.forward(faces)
-                        # out = recognizer(faces.unsqueeze(0)).detach().numpy()
-                        identity_lst.append(identity)
-                        representation_lst.append(out)
+                    if image.shape[0] != config['RECOGNIZER']['crop_img_size']:
+                        image = cv.resize(image, (config['RECOGNIZER']['crop_img_size'], config['RECOGNIZER']['crop_img_size']))
+                    image = np.transpose(image, (2,0,1)).astype(np.float32)
+
+                    out = recognizer.forward(np.expand_dims(image, axis=0))
+                    # out = recognizer(faces.unsqueeze(0)).detach().numpy()
+                    identity_lst.append(identity)
+                    representation_lst.append(out)
                 else:
                     print(f"Error reading file {img_file}")
 

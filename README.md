@@ -4,13 +4,7 @@ Detect and recognize face in realtime.
 
 **TO DO:**
 
-
-* Due to poor classifier performance, intend to experiment classifier with Deep Learning, Image Augmentation
-
-* Add `face-alignment` before `arc-face` feature extractor
-
-* Multiprocessing improve speed
-
+* Improve speed
 
 * Demo web-base application
 
@@ -19,7 +13,6 @@ Detect and recognize face in realtime.
 # Demo
 
 ![](./assets/demo.png)
-![](assets/demo2.png)
 
 # Run code
 
@@ -34,15 +27,20 @@ pip install -r requirements.txt
 
 There are two options
 
-* Manually creating `facebank` data.
+* Manually creating `facebank` data as:
+```
+/facebank
+├── /name1
+│   ├── *.jpg
+└── /name2
+    ├── *.jpg
+```
 
 * Get faces from webcam by running:
 
 ```
 python create_data.py
 ```
-
-Add `unknown` classes if necessary.
 
 3. Create `face embedding`
 

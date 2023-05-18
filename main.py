@@ -1,13 +1,13 @@
 import os
 import src
 import sys
-import torch
-import cv2 as cv
 import argparse
+import cv2 as cv
 import numpy as np
+
 from insightface.utils import face_align
 from imutils.video import WebcamVideoStream, FPS
-from torchvision.transforms import Resize
+# from torchvision.transforms import Resize
 
 # Load model
 detector, recognizer = src.loadDetectorRecognizer(keep_all=True)
@@ -26,26 +26,54 @@ def parse_opt():
 
 def process_face(frame:np.ndarray) -> np.ndarray:
     # Detect face
-    faces, _, boxes, _ = detector(frame)
-
-    if faces is not None:
-    # Get face embedding
-        faces = Resize((112, 112), antialias=True)(faces)
-        if faces.dim() == 3:
-            faces = torch.unsqueeze(faces, dim=0)
-        faces = faces.detach().numpy().astype(np.float32)
-
+    boxes, _, landmarks = detector.detect(frame, landmarks=True)
+    if boxes is not None and len(boxes) > 0:
         # Classify faces
-        for face, box in zip(faces, boxes):
-            out = recognizer.forward(np.expand_dims(face, axis=0))
+        for box, marks in zip(boxes, landmarks):
+            box = np.array(box).astype(np.int32)
+
+            # Crop the face in frame
+            crop_face = frame[box[1] : box[3], box[0] : box[2]]
+            crop_face_h, crop_face_w, _ = crop_face.shape
+
+            # Resize the crop face to the Recognizer need
+            resize_crop_face = cv.resize(crop_face, (112,112))
+            resize_crop_h, resize_crop_w, _ = resize_crop_face.shape
+
+            # Scale the landmark by the factor of downscale size
+            crop_marks = marks.copy()
+            crop_marks[:, 0] = crop_marks[:, 0] - box[0]
+            crop_marks[:, 1] = crop_marks[:, 1] - box[1]
+            scale_factor = np.array((resize_crop_w, resize_crop_h)) / np.array((crop_face_w, crop_face_h))
+            new_marks = np.multiply(crop_marks, scale_factor)
+
+            # Face Alignment
+            face_aligned = face_align.norm_crop(resize_crop_face, new_marks.astype(np.float64))
+            face_aligned = face_aligned.astype(np.uint8)
+            face_aligned = np.transpose(face_aligned, (2,0,1)).astype(np.float32)
+
+            # Extract Face Embedding
+            out = recognizer.forward(np.expand_dims(face_aligned, axis=0))
 
             # Predict identity
             pred = classifier.run(None, {input_name: out})
             pred_label = pred[0][0]
-            pred_acc = str(round(pred[1][0][pred_label] * 100, 2)) + "%"
+            pred_acc_logits = pred[1][0][pred_label]
+            
+            if pred_acc_logits >= config['classification_thres']: 
+                return_tag = pred_label + " " + str(round(pred[1][0][pred_label] * 100, 2)) + "%"
+            else:
+                return_tag = "unknown"
 
             # Draw bounding box
-            frame = src.putBoundingBox(frame, box.astype(np.int32), pred_label + " " + pred_acc)
+            frame = src.putBoundingBox(frame, box.astype(np.int32), return_tag)
+
+            # Draw landmarks
+            frame = cv.circle(frame, center=marks[0, :].astype(np.int32), radius=5, color=(0,255,0),thickness=-1)
+            frame = cv.circle(frame, center=marks[1, :].astype(np.int32), radius=5, color=(255,0,0),thickness=-1)
+            frame = cv.circle(frame, center=marks[2, :].astype(np.int32), radius=5, color=(0,0,255),thickness=-1)
+            frame = cv.circle(frame, center=marks[3, :].astype(np.int32), radius=5, color=(0,0,0),thickness=-1)
+            frame = cv.circle(frame, center=marks[4, :].astype(np.int32), radius=5, color=(255,255,255),thickness=-1)
 
     return frame
 

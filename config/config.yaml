@@ -26,9 +26,12 @@ BB:
     padding: 1
 
 RECOGNIZER:
+  crop_img_size: 112
   data_dir: ./facebank
   face_padding: 10
   min_area_scale: 0.02
   img_size: 112
   max_training_img: 50
   ckpt_path: resource/R100_MS1MV3.onnx # R100_MS1MV2, R100_MS1MV3, R100_Glint
+
+classification_thres: 0.9

@@ -3,10 +3,10 @@ import sys
 import yaml
 import gdown
 import onnxruntime as rt
+
 from termcolor import colored
 from insightface.model_zoo import get_model
-
-from .detector import myMTCNN
+from facenet_pytorch import MTCNN
 
 def load_config() -> dict:
     with open("./config/config.yaml") as f:
@@ -20,7 +20,7 @@ config = load_config()
 def loadDetectorRecognizer(keep_all:bool = True):
     # Init Detector
     print(colored("Detector initialize", 'blue'), end=' - ')
-    detector = myMTCNN(keep_all=keep_all, margin=20, post_process=False)
+    detector = MTCNN(keep_all=keep_all, post_process=False)
     print(colored("Done", 'green'))
 
     # Init Recognizer
