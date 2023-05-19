@@ -81,41 +81,44 @@ if __name__ == "__main__":
         boxes, probs, landmarks = detector.detect(img, landmarks=True)
         if boxes is not None and len(boxes) > 0:
             # Classify faces
-            for box, prob, marks in zip(boxes, probs, landmarks):
-                # Draw bounding box
-                frame = src.putBoundingBox(frame, box.astype(np.int32), str(round(prob * 100, 2)) + "%")
-                frame = cv.circle(frame, center=marks[0, :].astype(np.int32), radius=5, color=(0,255,0),thickness=-1)
-                frame = cv.circle(frame, center=marks[1, :].astype(np.int32), radius=5, color=(255,0,0),thickness=-1)
-                frame = cv.circle(frame, center=marks[2, :].astype(np.int32), radius=5, color=(0,0,255),thickness=-1)
-                frame = cv.circle(frame, center=marks[3, :].astype(np.int32), radius=5, color=(0,0,0),thickness=-1)
-                frame = cv.circle(frame, center=marks[4, :].astype(np.int32), radius=5, color=(255,255,255),thickness=-1)
-        
-            if (leap % 5 == 0) and (flag is True):
-                box = np.array(box).astype(np.int32)
+            try:
+                for box, prob, marks in zip(boxes, probs, landmarks):
+                    # Draw bounding box
+                    frame = src.putBoundingBox(frame, box.astype(np.int32), str(round(prob * 100, 2)) + "%")
+                    frame = cv.circle(frame, center=marks[0, :].astype(np.int32), radius=5, color=(0,255,0),thickness=-1)
+                    frame = cv.circle(frame, center=marks[1, :].astype(np.int32), radius=5, color=(255,0,0),thickness=-1)
+                    frame = cv.circle(frame, center=marks[2, :].astype(np.int32), radius=5, color=(0,0,255),thickness=-1)
+                    frame = cv.circle(frame, center=marks[3, :].astype(np.int32), radius=5, color=(0,0,0),thickness=-1)
+                    frame = cv.circle(frame, center=marks[4, :].astype(np.int32), radius=5, color=(255,255,255),thickness=-1)
+            
+                if (leap % 5 == 0) and (flag is True):
+                    box = np.array(box).astype(np.int32)
 
-                # Crop the face in frame
-                crop_face = img[box[1] : box[3], box[0] : box[2]]
-                crop_face_h, crop_face_w, _ = crop_face.shape
+                    # Crop the face in frame
+                    crop_face = img[box[1] : box[3], box[0] : box[2]]
+                    crop_face_h, crop_face_w, _ = crop_face.shape
 
-                # Resize the crop face to the Recognizer need
-                resize_crop_face = cv.resize(crop_face, (config['RECOGNIZER']['crop_img_size'],config['RECOGNIZER']['crop_img_size']))
-                resize_crop_h, resize_crop_w, _ = resize_crop_face.shape
+                    # Resize the crop face to the Recognizer need
+                    resize_crop_face = cv.resize(crop_face, (config['RECOGNIZER']['crop_img_size'],config['RECOGNIZER']['crop_img_size']))
+                    resize_crop_h, resize_crop_w, _ = resize_crop_face.shape
 
-                # Scale the landmark by the factor of downscale size
-                crop_marks = marks.copy()
-                crop_marks[:, 0] = crop_marks[:, 0] - box[0]
-                crop_marks[:, 1] = crop_marks[:, 1] - box[1]
-                scale_factor = np.array((resize_crop_w, resize_crop_h)) / np.array((crop_face_w, crop_face_h))
-                new_marks = np.multiply(crop_marks, scale_factor)
+                    # Scale the landmark by the factor of downscale size
+                    crop_marks = marks.copy()
+                    crop_marks[:, 0] = crop_marks[:, 0] - box[0]
+                    crop_marks[:, 1] = crop_marks[:, 1] - box[1]
+                    scale_factor = np.array((resize_crop_w, resize_crop_h)) / np.array((crop_face_w, crop_face_h))
+                    new_marks = np.multiply(crop_marks, scale_factor)
 
-                # Face Alignment
-                face_aligned = face_align.norm_crop(resize_crop_face, new_marks.astype(np.float64))
-                face_aligned = face_aligned.astype(np.uint8)
+                    # Face Alignment
+                    face_aligned = face_align.norm_crop(resize_crop_face, new_marks.astype(np.float64))
+                    face_aligned = face_aligned.astype(np.uint8)
 
-                save_file = os.path.join(user_dir, f"{username}_{count + 1}.jpeg")
+                    save_file = os.path.join(user_dir, f"{username}_{count + 1}.jpeg")
 
-                cv.imwrite(save_file, cv.cvtColor(face_aligned, cv.COLOR_RGB2BGR))
-                count += 1
+                    cv.imwrite(save_file, cv.cvtColor(face_aligned, cv.COLOR_RGB2BGR))
+                    count += 1
+            except:
+                pass
 
             if count >= config['RECOGNIZER']['max_training_img']:
                 flag = False
