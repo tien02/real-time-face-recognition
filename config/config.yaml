@@ -32,6 +32,8 @@ RECOGNIZER:
   min_area_scale: 0.02
   img_size: 112
   max_training_img: 50
-  ckpt_path: resource/R100_MS1MV3.onnx # R100_MS1MV2, R100_MS1MV3, R100_Glint
+  ckpt_path: resource/R100_Glint.onnx # R100_MS1MV2, R100_MS1MV3, R100_Glint, R50_MS1MV3, R50_Glint
 
-classification_thres: 0.9
+CLASSIFIER:
+  use_model: ml_model # similarity, ml_model : whether using machine learning model or consine simmilarity
+  threshold: 0.9

@@ -39,7 +39,7 @@ if __name__ == "__main__":
         sys.exit()
     
     # Set up save path
-    username = input(colored("User name: ", "blue"))
+    username = input(colored("User name: ", "blue")).strip()
     user_dir = os.path.join(data_dir, username)
     if not os.path.exists(user_dir):
         os.makedirs(user_dir)

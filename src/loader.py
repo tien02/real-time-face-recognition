@@ -20,7 +20,7 @@ config = load_config()
 def loadDetectorRecognizer(keep_all:bool = True):
     # Init Detector
     print(colored("Detector initialize", 'blue'), end=' - ')
-    detector = MTCNN(keep_all=keep_all, post_process=False)
+    detector = MTCNN(keep_all=keep_all)
     print(colored("Done", 'green'))
 
     # Init Recognizer
@@ -52,6 +52,7 @@ def loadClassifier():
     print(colored("Done", 'green'))
     return classifier, input_name
 
+
 def download_ckpt(file_name):
     if file_name == "R100_MS1MV2":
         drive_path = 'https://drive.google.com/file/d/1772DTho9EG047KNUIv2lop2e7EobiCFn/view'
@@ -59,6 +60,10 @@ def download_ckpt(file_name):
         drive_path = 'https://drive.google.com/file/d/1fZOfvfnavFYjzfFoKTh5j1YDcS8KCnio/view'
     elif file_name == "R100_Glint":
         drive_path = 'https://drive.google.com/file/d/1Gh8C-bwl2B90RDrvKJkXafvZC3q4_H_z/view'
+    elif file_name == "R50_MS1MV3":
+        drive_path = "https://drive.google.com/file/d/1FPldzmZ6jHfaC-R-jLkxvQRP-cLgxjCT/view"
+    elif file_name == "R50_Glint":
+        drive_path = "https://drive.google.com/file/d/1MpRhM76OQ6cTzpr2ZSpHp2_CP19Er4PI/view"
     else:
         print(f"Don't support {file_name}")
         return

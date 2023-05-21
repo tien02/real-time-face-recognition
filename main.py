@@ -6,13 +6,15 @@ import cv2 as cv
 import numpy as np
 
 from insightface.utils import face_align
+from utils import load_data, cosine_similarity
 from imutils.video import WebcamVideoStream, FPS
-# from torchvision.transforms import Resize
 
 # Load model
 detector, recognizer = src.loadDetectorRecognizer(keep_all=True)
 classifier, input_name = src.loadClassifier()
 config = src.load_config()
+data = load_data(config['RECOGNIZER']['data_dir'])
+values = np.concatenate(data['embedding'])
 
 
 def parse_opt():
@@ -22,6 +24,29 @@ def parse_opt():
     parser.add_argument('-s', '--save', action='store_true', help="Save image after drawing")
     opt = parser.parse_args()
     return opt
+
+
+def predict_id(query):
+    if config['CLASSIFIER']['use_model'] == "ml_model":
+        pred = classifier.run(None, {input_name: query})
+        pred_label = pred[0][0]
+        pred_acc_logits = pred[1][0][pred_label]
+
+        if pred_acc_logits >= config['CLASSIFIER']['threshold']: 
+            return_tag = pred_label + " " + str(round(pred[1][0][pred_label] * 100, 2)) + "%"
+        else:
+            return_tag = "unknown"
+
+    else:
+        vector_sim = cosine_similarity(query, values)
+        pred_id = np.argmax(vector_sim, axis=1)[0]
+        pred_logits = vector_sim[0,pred_id] 
+        if pred_logits <= config['CLASSIFIER']['threshold']:
+            return_tag = 'unknown'
+        else:
+            return_tag = data['name'][pred_id] + " " + str(round(pred_logits * 100, 2)) + "%"
+
+    return return_tag
 
 
 def process_face(frame:np.ndarray) -> np.ndarray:
@@ -57,14 +82,7 @@ def process_face(frame:np.ndarray) -> np.ndarray:
                 out = recognizer.forward(np.expand_dims(face_aligned, axis=0))
 
                 # Predict identity
-                pred = classifier.run(None, {input_name: out})
-                pred_label = pred[0][0]
-                pred_acc_logits = pred[1][0][pred_label]
-                
-                if pred_acc_logits >= config['classification_thres']: 
-                    return_tag = pred_label + " " + str(round(pred[1][0][pred_label] * 100, 2)) + "%"
-                else:
-                    return_tag = "unknown"
+                return_tag = predict_id(out)
 
                 # Draw bounding box
                 frame = src.putBoundingBox(frame, box.astype(np.int32), return_tag)
@@ -75,6 +93,7 @@ def process_face(frame:np.ndarray) -> np.ndarray:
                 frame = cv.circle(frame, center=marks[2, :].astype(np.int32), radius=5, color=(0,0,255),thickness=-1)
                 frame = cv.circle(frame, center=marks[3, :].astype(np.int32), radius=5, color=(0,0,0),thickness=-1)
                 frame = cv.circle(frame, center=marks[4, :].astype(np.int32), radius=5, color=(255,255,255),thickness=-1)
+            
         except:
             pass
     return frame
@@ -103,8 +122,8 @@ def video(save:bool = False):
         if not os.path.exists("./result"):
             os.makedirs("result")
         record = cv.VideoWriter(f'result/{video_name}.avi', 
-                         cv.VideoWriter_fourcc(*'MJPG'),
-                         30, (config["FRAME"]["WIDTH"], config["FRAME"]["HEIGHT"]))
+                        cv.VideoWriter_fourcc(*'MJPG'),
+                        10, (config["FRAME"]["WIDTH"], config["FRAME"]["HEIGHT"]))
 
     # Working
     while True:
