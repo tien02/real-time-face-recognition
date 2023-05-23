@@ -22,6 +22,7 @@ def load_data(data_dir:str):
     final_data = {'name': [], "embedding": []}
     pkl_lst = glob.glob(f"{data_dir}/*/*.pkl")
 
+    assert len(pkl_lst) > 0, 'No user in database'
     assert len(pkl_lst) == len(next(os.walk(data_dir))[1]), "Expect each subdirectory have .pkl reprensentation"
 
     for pkl_file in pkl_lst:

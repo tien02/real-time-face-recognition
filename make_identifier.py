@@ -1,7 +1,6 @@
-import sys
-import torch
 import os
 import src
+import sys
 import pickle
 import argparse
 import cv2 as cv
@@ -25,7 +24,7 @@ def parse_opt():
     return opt
 
 
-def create_embedding(force:bool):
+def create_embedding(force:bool = False):
     print(colored(f"Create Embedding...", "blue"))
 
     data_dir = config['RECOGNIZER']['data_dir']
@@ -80,28 +79,24 @@ def create_embedding(force:bool):
     print("DONE")
 
 
-if __name__ == "__main__":
-    opt = parse_opt()
-    create_embedding(**vars(opt))
-
-    if config['CLASSIFIER']['use_model'] == "similarity":
-        sys.exit()
-
+def create_classifier():
+    # Create a classifier
     print(colored(f"Create Classifier...", "blue"))
     data = load_data(config['RECOGNIZER']['data_dir'])
 
     X = np.array(data['embedding']).squeeze(axis=1)
     y = np.array(data['name'])
 
-    # Split train - test
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=40, shuffle=True)
+    # # Split train - test
+    # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=40, shuffle=True)
 
     # Train - Test
     model = MLPClassifier(max_iter=5000, random_state=40)
 
-    model.fit(X_train, y_train)
-    pred = model.predict(X_test)
-    evaluate(y_test, pred, model.classes_)
+    model.fit(X,y)
+    # model.fit(X_train, y_train)
+    # pred = model.predict(X_test)
+    # evaluate(y_test, pred, model.classes_)
 
     # Export to onnx
     if not os.path.exists('./resource'):
@@ -111,3 +106,13 @@ if __name__ == "__main__":
     onx = convert_sklearn(model, initial_types=initial_type)
     with open("resource/classifier.onnx", "wb") as f:
         f.write(onx.SerializeToString())
+
+
+if __name__ == "__main__":
+    opt = parse_opt()
+    create_embedding(**vars(opt))
+
+    if config['CLASSIFIER']['use_model'] == "similarity":
+        sys.exit()
+    
+    create_classifier()

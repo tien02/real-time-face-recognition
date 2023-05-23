@@ -36,4 +36,4 @@ RECOGNIZER:
 
 CLASSIFIER:
   use_model: ml_model # similarity, ml_model : whether using machine learning model or consine simmilarity
-  threshold: 0.9
+  threshold: 0.
