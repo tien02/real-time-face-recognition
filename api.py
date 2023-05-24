@@ -2,17 +2,16 @@ import os
 import glob
 import shutil
 import cv2 as cv
-import shutil
+import numpy as np
 from PIL import Image
-import src
-from make_identifier import create_classifier, create_embedding
-from utils import load_data, cosine_similarity
+from insightface.utils import face_align
 
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Query, HTTPException, File, UploadFile, BackgroundTasks
 
-import numpy as np
+import src
+from make_identifier import create_classifier, create_embedding
 
 app = FastAPI()
 
@@ -38,8 +37,6 @@ app.add_middleware(
 detector, recognizer = src.loadDetectorRecognizer(keep_all=True)
 classifier, input_name = src.loadClassifier()
 config = src.load_config()
-# data = load_data(config['RECOGNIZER']['data_dir'])
-# values = np.concatenate(data['embedding'])
 
 
 @app.get("/")
@@ -95,12 +92,20 @@ def show_img(name: str | None = None):
     return FileResponse(img_file[0])
 
 
+@app.get('/prepapre-resource/')
+def prepare_resource():
+    '''
+    Retrain model
+    '''
+    create_embedding(force=True)
+
+
 @app.post('/register')
 def face_register(
     background_tasks: BackgroundTasks,
     img_files: list[UploadFile] | None = File(..., description="Upload Image"),
     to_gray: bool | None = Query(
-            default=True, 
+            default=False, 
             description="Whether save image in gray scale or not"),
     username: str  = Query(
         ...,
@@ -146,7 +151,6 @@ def face_register(
 
                 np_image = cv.cvtColor(np_image, cv.COLOR_BGR2GRAY)
 
-                cv.imwrite(save_img_dir, np_image)
             except:
                 raise HTTPException(status_code=500, detail="Something went wrong when saving the image")
             finally:
@@ -164,11 +168,10 @@ def face_register(
 def face_recognition(
     img_file:UploadFile =  File(...,description="Query image file"),
     to_gray: bool | None = Query(
-            default=True, 
+            default=False, 
             description="Whether save image in gray scale or not"),
-    return_image_name:bool = Query(default=True, description="Whether return only image name or full image path"),
+    return_img_file:bool = Query(default=False, description="Whether return username or image after process face recognizer"),
 ):
-
     '''
     Do Face Recognition task, give the image which is 
     the most similar with the input image from the 
@@ -176,84 +179,88 @@ def face_recognition(
 
     Arguments:  
         img_file(File): image file
-        return_image_name(bool): Decide whether return only image file (img) or image file with extension (img.[jpg|jpeg])
+        return_img_file(bool): Decide whether return only image file (img) or image file with extension (img.[jpg|jpeg])
     Return:
         Return path to the most similar image file
     '''
-
-    # Check if database is empty
-    empty = check_empty_db()
-    if empty:
-        return "No image found in the database"
-
-    if len(os.listdir(config.DB_PATH)) == 0:
+    if len(next(os.walk(config['RECOGNIZER']['data_dir']))[1]) == 0:
         return {
-            "message": "No image found in the database."
+            "message": "No user found in the database."
         }
-    
-    # Save query image to ./query
-    if not os.path.exists("query"):
-        os.makedirs("query")
-
-    if '/' in img_file.filename:    
-        query_img_path = os.path.join("query", img_file.filename.split('/')[-1])
-    elif "\\" in img_file.filename:
-        query_img_path = os.path.join("query", img_file.filename.split("\\")[-1])
-    else:
-        query_img_path = os.path.join("query", img_file.filename)
 
     # Convert image to gray (if necessary) then save it
+    image = Image.open(img_file.file)
+    if image.mode in ("RGBA", "P"):
+        image = image.convert("RGB")
+    np_image = np.array(image)
     if to_gray:
-        image = Image.open(img_file.file)
-        if image.mode in ("RGBA", "P"):
-            image = image.convert("RGB")
-        np_image = np.array(image)
         np_image = cv.cvtColor(np_image, cv.COLOR_BGR2GRAY)
 
-        cv.imwrite(query_img_path, np_image)
-    else:
-        with open(query_img_path, "wb") as w:
-            shutil.copyfileobj(img_file.file, w)
-
     # Face detection - recognition
-    # try:
-    df = DeepFace.find(img_path=query_img_path, 
-                        db_path = config.DB_PATH, 
-                        model_name = config.MODELS[config.MODEL_ID], 
-                        distance_metric = config.METRICS[config.METRIC_ID], 
-                        detector_backend = config.DETECTORS[config.DETECTOR_ID], 
-                        silent = True, align = True, prog_bar = False, enforce_detection=False)
-    # except:
-    #     return {
-    #         'error': "Error happening when trying to detecting face or recognition"
-    #     }
-    
-    # Remove query image
-    os.remove(query_img_path)
+    boxes, _, landmarks = detector.detect(np_image, landmarks=True)
 
-    # If faces are detected/recognized
-    if not df.empty:
-        path_to_img, metric = df.columns
-        ascending = True
-        if config.METRIC_ID == 0:
-            ascending = False
-        df = df.sort_values(by=[metric], ascending=ascending)
-        value_img_path = df[path_to_img].iloc[0]
+    if boxes is not None and len(boxes) > 0:
+        # Classify faces
+        for box, marks in zip(boxes, landmarks):
+            box = np.array(box).astype(np.int32)
 
-        if return_image_name:
-            return_value = value_img_path.split(os.path.sep)[-1]
-            return_value = return_value.split(".")[0]
-            return {
-                "result": return_value,
-            }
-        else:
-            return {
-                "result": value_img_path,
-            }
-    else:
-        return {
-            "result": "No faces have been found"
-        }
+            # Crop the face in np_image
+            crop_face = np_image[box[1] : box[3], box[0] : box[2]]
+            crop_face_h, crop_face_w, _ = crop_face.shape
+
+            # Resize the crop face to the Recognizer need
+            resize_crop_face = cv.resize(crop_face, (112,112))
+            resize_crop_h, resize_crop_w, _ = resize_crop_face.shape
+
+            # Scale the landmark by the factor of downscale size
+            crop_marks = marks.copy()
+            crop_marks[:, 0] = crop_marks[:, 0] - box[0]
+            crop_marks[:, 1] = crop_marks[:, 1] - box[1]
+            scale_factor = np.array((resize_crop_w, resize_crop_h)) / np.array((crop_face_w, crop_face_h))
+            new_marks = np.multiply(crop_marks, scale_factor)
+
+            # Face Alignment
+            face_aligned = face_align.norm_crop(resize_crop_face, new_marks.astype(np.float64))
+            face_aligned = face_aligned.astype(np.uint8)
+            face_aligned = np.transpose(face_aligned, (2,0,1)).astype(np.float32)
+
+            # Extract Face Embedding
+            out = recognizer.forward(np.expand_dims(face_aligned, axis=0))
+
+            # Predict identity
+            pred = classifier.run(None, {input_name: out})
+            pred_label = pred[0][0]
+            pred_acc_logits = pred[1][0][pred_label]
+
+            print(pred_label)
+            print(pred_acc_logits)
+
+            if pred_acc_logits >= config['CLASSIFIER']['threshold']: 
+                return_name = pred_label
+                # acc = str(round(pred[1][0][pred_label] * 100, 2)) + "%"
+                pred_user = return_name
+            else:
+                pred_user = "unknown"
+
+            # Draw bounding box
+            if return_img_file:
+                np_image = src.putBoundingBox(np_image, box.astype(np.int32), pred_user)
+
+                # Draw landmarks
+                np_image = cv.circle(np_image, center=marks[0, :].astype(np.int32), radius=5, color=(0,255,0),thickness=-1)
+                np_image = cv.circle(np_image, center=marks[1, :].astype(np.int32), radius=5, color=(255,0,0),thickness=-1)
+                np_image = cv.circle(np_image, center=marks[2, :].astype(np.int32), radius=5, color=(0,0,255),thickness=-1)
+                np_image = cv.circle(np_image, center=marks[3, :].astype(np.int32), radius=5, color=(0,0,0),thickness=-1)
+                np_image = cv.circle(np_image, center=marks[4, :].astype(np.int32), radius=5, color=(255,255,255),thickness=-1)
+
+                np_image = cv.cvtColor(np_image, cv.COLOR_RGB2BGR)
+                success, im = cv.imencode('.png', np_image)
+                headers = {'Content-Disposition': 'inline; filename="test.png"'}
+                return Response(im.tobytes() , headers=headers, media_type='image/png')
+            else:
+                return {
+                    'result': pred_user,
+                }
 
 
 @app.put('/change-username')
