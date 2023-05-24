@@ -127,7 +127,9 @@ def face_register(
     
     # Save image to database
     for img_file in img_files:
-        
+        # Case when > 1 face in an image
+        count_face = 0
+
         # Process to valid save name
         if '/' in img_file.filename:    
             save_img_dir = os.path.join(save_dir, img_file.filename.split('/')[-1])
@@ -135,26 +137,60 @@ def face_register(
             save_img_dir = os.path.join(save_dir, img_file.filename.split("\\")[-1])
         else:
             save_img_dir = os.path.join(save_dir, img_file.filename)
-        if to_gray is False:
-            with open(save_img_dir, "wb") as w:
-                shutil.copyfileobj(img_file.file, w)
 
-        else:
-            try:
-                image = Image.open(img_file.file)
-                if image.mode in ("RGBA", "P"):
-                    image = image.convert("RGB")
+        # Convert image to gray scale if necessary
 
-                np_image = np.array(image)
-                np_image = cv.cvtColor(np_image, cv.COLOR_RGB2BGR)
+        try:
+            image = Image.open(img_file.file)
+            if image.mode in ("RGBA", "P"):
+                image = image.convert("RGB")
 
-                np_image = cv.cvtColor(np_image, cv.COLOR_BGR2GRAY)
+            np_image = np.array(image)
+            if to_gray:
+                np_image = cv.cvtColor(np_image, cv.COLOR_RGB2GRAY)
 
-            except:
-                raise HTTPException(status_code=500, detail="Something went wrong when saving the image")
-            finally:
-                img_file.file.close()
-                image.close()
+            boxes, _, landmarks = detector.detect(np_image, landmarks=True)
+            if boxes is not None and len(boxes) > 0:
+            # Classify faces
+                try:
+                    for box, marks in zip(boxes, landmarks):
+                        box = np.array(box).astype(np.int32)
+
+                        # Crop the face in frame
+                        crop_face = np_image[box[1] : box[3], box[0] : box[2]]
+                        crop_face_h, crop_face_w, _ = crop_face.shape
+
+                        # Resize the crop face to the Recognizer need
+                        resize_crop_face = cv.resize(crop_face, (config['RECOGNIZER']['crop_img_size'],config['RECOGNIZER']['crop_img_size']))
+                        resize_crop_h, resize_crop_w, _ = resize_crop_face.shape
+
+                        # Scale the landmark by the factor of downscale size
+                        crop_marks = marks.copy()
+                        crop_marks[:, 0] = crop_marks[:, 0] - box[0]
+                        crop_marks[:, 1] = crop_marks[:, 1] - box[1]
+                        scale_factor = np.array((resize_crop_w, resize_crop_h)) / np.array((crop_face_w, crop_face_h))
+                        new_marks = np.multiply(crop_marks, scale_factor)
+
+                        # Face Alignment
+                        face_aligned = face_align.norm_crop(resize_crop_face, new_marks.astype(np.float64))
+                        face_aligned = face_aligned.astype(np.uint8)
+
+                        # Save image directory
+                        if count_face >=1:
+                            dir_path, extension = save_img_dir.split('.')
+                            save_img_dir = dir_path + f'_{count_face}.' + extension
+                        cv.imwrite(save_img_dir, cv.cvtColor(face_aligned, cv.COLOR_RGB2BGR))
+
+                        count_face += 1
+                except:
+                    print("Error while croping image faces")
+                    pass
+                
+        except:
+            raise HTTPException(status_code=500, detail="Something went wrong when reading & saving the image")
+        finally:
+            img_file.file.close()
+            image.close()
 
     # Update database & classifier                
     background_tasks.add_task(create_embedding)
@@ -202,6 +238,10 @@ def face_recognition(
 
     if boxes is not None and len(boxes) > 0:
         # Classify faces
+        pred_user_name_lst = []
+        pred_acc_lst = []
+
+        # Traverse bounding boxes
         for box, marks in zip(boxes, landmarks):
             box = np.array(box).astype(np.int32)
 
@@ -237,9 +277,13 @@ def face_recognition(
             pred_acc_logits = pred[1][0][pred_label]
 
             if pred_acc_logits >= config['CLASSIFIER']['threshold']: 
-                pred_user = pred_label
+                # pred_user = pred_label
+                pred_user_name_lst.append(pred_label)
+                pred_acc_lst.append(str(round(pred_acc_logits * 100,2)) + "%")
             else:
-                pred_user = "unknown"
+                # pred_user = "unknown"
+                pred_user_name_lst.append("unknown")
+                pred_acc_lst.append(str(round(pred_acc_logits * 100,2)) + "%")
 
             # Draw bounding box
             if return_img_file:
@@ -251,16 +295,18 @@ def face_recognition(
                 np_image = cv.circle(np_image, center=marks[2, :].astype(np.int32), radius=5, color=(0,0,255),thickness=-1)
                 np_image = cv.circle(np_image, center=marks[3, :].astype(np.int32), radius=5, color=(0,0,0),thickness=-1)
                 np_image = cv.circle(np_image, center=marks[4, :].astype(np.int32), radius=5, color=(255,255,255),thickness=-1)
-
-                # Response image file
-                np_image = cv.cvtColor(np_image, cv.COLOR_RGB2BGR)
-                _, im = cv.imencode('.png', np_image)
-                headers = {'Content-Disposition': 'inline; filename="test.png"'}
-                return Response(im.tobytes() , headers=headers, media_type='image/png')
-            else:
-                return {
-                    'result': pred_user,
-                }
+        
+        if return_img_file:
+            # Response image file
+            np_image = cv.cvtColor(np_image, cv.COLOR_RGB2BGR)
+            _, im = cv.imencode('.png', np_image)
+            headers = {'Content-Disposition': 'inline; filename="test.png"'}
+            return Response(im.tobytes() , headers=headers, media_type='image/png')
+        else:
+            return {
+                'predict_user_name': pred_user_name_lst,
+                'predict_accuracy': pred_acc_lst,
+            }
 
 
 @app.put('/change-username')

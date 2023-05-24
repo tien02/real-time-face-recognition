@@ -1,1 +1,0 @@
-docker run -it --rm --volume facedb:/myapi/facebank -p 80:80 face-api bash
