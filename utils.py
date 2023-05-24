@@ -15,21 +15,21 @@ from skl2onnx.common.data_types import FloatTensorType
 
 config = src.load_config()
 
-class GlobalVariable:
+class GlobalClassifier:
     classifier = None
     input_name = None
     
     @staticmethod
     def GetClassifier():
-        if (GlobalVariable.classifier == None) or (GlobalVariable.input_name == None):
+        if (GlobalClassifier.classifier == None) or (GlobalClassifier.input_name == None):
             create_classifier()
-            GlobalVariable.classifier, GlobalVariable.input_name = src.loadClassifier()
-        return GlobalVariable.classifier, GlobalVariable.input_name
+            GlobalClassifier.classifier, GlobalClassifier.input_name = src.loadClassifier()
+        return GlobalClassifier.classifier, GlobalClassifier.input_name
 
     @staticmethod
     def UpdateClassifier():
         create_classifier()
-        GlobalVariable.classifier, GlobalVariable.input_name = src.loadClassifier()
+        GlobalClassifier.classifier, GlobalClassifier.input_name = src.loadClassifier()
   
 
 

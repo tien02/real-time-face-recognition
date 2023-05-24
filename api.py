@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Query, File, HTTPException, UploadFile, BackgroundTasks
 
 import src
-from utils import GlobalVariable, create_embedding
+from utils import GlobalClassifier, create_embedding
 
 app = FastAPI()
 
@@ -196,7 +196,7 @@ def face_register(
     background_tasks.add_task(create_embedding)
     if config['CLASSIFIER']['use_model'] == "ml_model":
         # background_tasks.add_task(create_classifier)
-        background_tasks.add_task(GlobalVariable.UpdateClassifier)
+        background_tasks.add_task(GlobalClassifier.UpdateClassifier)
         
     return {
         "message": f"{username} is created.",
@@ -269,7 +269,7 @@ def face_recognition(
             out = recognizer.forward(np.expand_dims(face_aligned, axis=0))
 
             # Get classifier
-            classifier, input_name = GlobalVariable.GetClassifier()
+            classifier, input_name = GlobalClassifier.GetClassifier()
 
             # Predict identity
             pred = classifier.run(None, {input_name: out})
@@ -277,13 +277,13 @@ def face_recognition(
             pred_acc_logits = pred[1][0][pred_label]
 
             if pred_acc_logits >= config['CLASSIFIER']['threshold']: 
-                # pred_user = pred_label
                 pred_user_name_lst.append(pred_label)
                 pred_acc_lst.append(str(round(pred_acc_logits * 100,2)) + "%")
+                pred_user = pred_label + " " + str(round(pred_acc_logits * 100,2)) + "%"
             else:
-                # pred_user = "unknown"
                 pred_user_name_lst.append("unknown")
                 pred_acc_lst.append(str(round(pred_acc_logits * 100,2)) + "%")
+                pred_user = "unknown" + " " + str(round(pred_acc_logits * 100,2)) + "%"
 
             # Draw bounding box
             if return_img_file:
@@ -340,7 +340,7 @@ def change_img_name(
 
     background_tasks.add_task(create_embedding)
     if config['CLASSIFIER']['use_model'] == "ml_model":
-        background_tasks.add_task(GlobalVariable.UpdateClassifier)
+        background_tasks.add_task(GlobalClassifier.UpdateClassifier)
 
     return {
         "message": f"Already change {old_name} to {new_name}"
