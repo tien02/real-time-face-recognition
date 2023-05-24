@@ -1,1 +1,1 @@
-docker run -it --rm --volume facedb:/myapi/facebank -p 8000:8000 face-api bash
+docker run -it --name myapi --volume facedb:/myapi/facebank -p 80:80 face-api bash
