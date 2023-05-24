@@ -2,19 +2,11 @@
 
 Detect and recognize face in realtime.
 
-**TO DO:**
-
-* Improve speed
-
-* Demo web-base application
-
-* Containerize with Docker
-
 # Demo
 
 ![](./assets/demo.png)
 
-# Run code
+# Run local
 
 Expect `Python >= 3.10`
 
@@ -39,25 +31,17 @@ There are two options
 * Get faces from webcam by running:
 
 ```
-python create_data.py
+python make_data.py
 ```
 
-3. Create `face embedding`
+3. Create `face embedding` & train a classifier
 
 Create face embedding for each image in the dataset. **Expect 1 face each images**. Embedding from `ArcFace` is a vector `(1,512)`.
 ```
-python create_embedding.py
+python make_identifier.py
 ```
 
-4. Train a Classifier
-
-Create classifier for face recognition, using machine learning algorithm. See detail in the file:
-
-```
-python create_classifier.py
-```
-
-5. Inference
+4. Inference
 
 Run the following command for details information:
 
@@ -70,3 +54,24 @@ python main.py --help
 * `-p` path to the image file.
 
 * `-s` save the image/video after processing.
+
+# Run API
+
+## Run on local
+```
+bash run_api.sh
+```
+
+## Docker
+1. Build the container
+```
+bash build.sh
+```
+2. Run the container
+```
+bash run.sh
+```
+3. Run API
+```
+bash run_api.sh
+```
