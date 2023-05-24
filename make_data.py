@@ -1,6 +1,5 @@
 import os
 import sys
-import torch
 import cv2 as cv
 import numpy as np
 

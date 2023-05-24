@@ -43,8 +43,8 @@ def loadClassifier():
     print(colored('Classifier initialize', 'blue'), end=" - ")
 
     if not os.path.exists(ckpt_path):
-        print(f"Can't find {ckpt_path}, make sure execute create_classifier.py first")
-        sys.exit()
+        print(f"Can't find {ckpt_path}")
+        return
 
     classifier = rt.InferenceSession(ckpt_path, providers=["CPUExecutionProvider"])
     input_name = classifier.get_inputs()[0].name

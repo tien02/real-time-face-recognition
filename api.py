@@ -6,12 +6,12 @@ import numpy as np
 from PIL import Image
 from insightface.utils import face_align
 
-from fastapi.responses import FileResponse, StreamingResponse, Response
+from fastapi.responses import FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, Query, HTTPException, File, UploadFile, BackgroundTasks
+from fastapi import FastAPI, Query, File, HTTPException, UploadFile, BackgroundTasks
 
 import src
-from make_identifier import create_classifier, create_embedding
+from utils import GlobalVariable, create_embedding
 
 app = FastAPI()
 
@@ -35,7 +35,6 @@ app.add_middleware(
 
 # Load model
 detector, recognizer = src.loadDetectorRecognizer(keep_all=True)
-classifier, input_name = src.loadClassifier()
 config = src.load_config()
 
 
@@ -95,7 +94,7 @@ def show_img(name: str | None = None):
 @app.get('/prepapre-resource/')
 def prepare_resource():
     '''
-    Retrain model
+    Recreate embedding & classifier
     '''
     create_embedding(force=True)
 
@@ -112,10 +111,11 @@ def face_register(
         description="File's name to be save, file extension can be available or not",
     ),):
     '''
-    Add new user to the database by face registering. Resize image if necessary.
+    Add new user to the database
 
      Arguments:  
         img_files(File): upload image file
+        to_gray(bool): whether convert to gray scale image or not
         username(string): user name to be saved
     '''
     save_dir = os.path.join(config['RECOGNIZER']['data_dir'], username)
@@ -135,7 +135,6 @@ def face_register(
             save_img_dir = os.path.join(save_dir, img_file.filename.split("\\")[-1])
         else:
             save_img_dir = os.path.join(save_dir, img_file.filename)
-
         if to_gray is False:
             with open(save_img_dir, "wb") as w:
                 shutil.copyfileobj(img_file.file, w)
@@ -156,9 +155,13 @@ def face_register(
             finally:
                 img_file.file.close()
                 image.close()
+
+    # Update database & classifier                
     background_tasks.add_task(create_embedding)
     if config['CLASSIFIER']['use_model'] == "ml_model":
-        background_tasks.add_task(create_classifier)
+        # background_tasks.add_task(create_classifier)
+        background_tasks.add_task(GlobalVariable.UpdateClassifier)
+        
     return {
         "message": f"{username} is created.",
     }
@@ -173,9 +176,7 @@ def face_recognition(
     return_img_file:bool = Query(default=False, description="Whether return username or image after process face recognizer"),
 ):
     '''
-    Do Face Recognition task, give the image which is 
-    the most similar with the input image from the 
-    database - in this case is a folder of images
+    Do Face Recognition task
 
     Arguments:  
         img_file(File): image file
@@ -227,18 +228,16 @@ def face_recognition(
             # Extract Face Embedding
             out = recognizer.forward(np.expand_dims(face_aligned, axis=0))
 
+            # Get classifier
+            classifier, input_name = GlobalVariable.GetClassifier()
+
             # Predict identity
             pred = classifier.run(None, {input_name: out})
             pred_label = pred[0][0]
             pred_acc_logits = pred[1][0][pred_label]
 
-            print(pred_label)
-            print(pred_acc_logits)
-
             if pred_acc_logits >= config['CLASSIFIER']['threshold']: 
-                return_name = pred_label
-                # acc = str(round(pred[1][0][pred_label] * 100, 2)) + "%"
-                pred_user = return_name
+                pred_user = pred_label
             else:
                 pred_user = "unknown"
 
@@ -253,8 +252,9 @@ def face_recognition(
                 np_image = cv.circle(np_image, center=marks[3, :].astype(np.int32), radius=5, color=(0,0,0),thickness=-1)
                 np_image = cv.circle(np_image, center=marks[4, :].astype(np.int32), radius=5, color=(255,255,255),thickness=-1)
 
+                # Response image file
                 np_image = cv.cvtColor(np_image, cv.COLOR_RGB2BGR)
-                success, im = cv.imencode('.png', np_image)
+                _, im = cv.imencode('.png', np_image)
                 headers = {'Content-Disposition': 'inline; filename="test.png"'}
                 return Response(im.tobytes() , headers=headers, media_type='image/png')
             else:
@@ -270,7 +270,7 @@ def change_img_name(
     new_name:str = Query(..., description="New name")
     ):
     '''
-    Change file name in database
+    Change user name in database
 
     Arguments:
         old_name (str) Path to the source name (e.g: user1)
@@ -293,6 +293,8 @@ def change_img_name(
     os.rename(old_id_dir, new_id_dir)
 
     background_tasks.add_task(create_embedding)
+    if config['CLASSIFIER']['use_model'] == "ml_model":
+        background_tasks.add_task(GlobalVariable.UpdateClassifier)
 
     return {
         "message": f"Already change {old_name} to {new_name}"
@@ -302,7 +304,7 @@ def change_img_name(
 @app.delete('/del-one-user')
 def del_img(name:str = Query(..., description="User name to be removed")):
     '''
-    Delete single image file in database
+    Delete user in database
 
     Arguments:
         img_path (str) Path to the image (e.g: images/img1.jpeg)
