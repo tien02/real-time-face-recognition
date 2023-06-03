@@ -9,3 +9,5 @@ COPY ./requirements.txt /myapi/requirements.txt
 RUN pip install --no-cache-dir -r /myapi/requirements.txt
 
 COPY . /myapi
+
+CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "80", "--reload"]
